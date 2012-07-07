@@ -19,6 +19,9 @@ module Control.Monad.Trans.Loop (
     foreach,
     stepLoopT,
     iterateLoopT,
+
+    -- * Lifting other operations
+    liftLocalLoopT,
 ) where
 
 import Control.Applicative
@@ -57,8 +60,10 @@ instance MonadTrans (LoopT c e) where
 instance MonadIO m => MonadIO (LoopT c e m) where
     liftIO = lift . liftIO
 
+
 ------------------------------------------------------------------------
 -- continue and exit
+
 
 -- | Skip the rest of the loop body and go to the next iteration.
 continue :: LoopT () e m a
@@ -77,8 +82,10 @@ continueWith c = LoopT $ \next _ _ -> next c
 exitWith :: e -> LoopT c e m a
 exitWith e = LoopT $ \_ fin _ -> fin e
 
+
 ------------------------------------------------------------------------
 -- Looping constructs
+
 
 -- | Repeat the loop body while the predicate holds.  Like a @while@ loop in C,
 -- the condition is tested first.
@@ -123,3 +130,14 @@ stepLoopT body next = runLoopT body next return next
 iterateLoopT :: Monad m => c -> (c -> LoopT c e m c) -> m e
 iterateLoopT z body = loop z
   where loop c = stepLoopT (body c) loop
+
+
+------------------------------------------------------------------------
+-- Lifting other operations
+
+-- | Lift a function like 'Control.Monad.Trans.Reader.local' or
+-- 'Control.Exception.mask_'.
+liftLocalLoopT :: Monad m => (forall a. m a -> m a) -> LoopT c e m b -> LoopT c e m b
+liftLocalLoopT f cb = LoopT $ \next fin cont -> do
+    m <- f $ runLoopT cb (return . next) (return . fin) (return . cont)
+    m
