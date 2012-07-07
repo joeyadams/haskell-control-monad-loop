@@ -1,6 +1,8 @@
 module Control.Monad.Trans.Loop (
     -- * The LoopT monad transformer
     LoopT(..),
+
+    -- * continue and exit
     continue,
     exit,
     continueWith,
@@ -13,25 +15,38 @@ module Control.Monad.Trans.Loop (
     iterateLoopT,
 ) where
 
+import Control.Applicative
+import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 
 -- | 'LoopT' is a monad transformer for the loop body.  It provides two
 -- capabilities:
 --
---  * Continue to the next iteration.
+--  * 'continue' to the next iteration.
 --
---  * Exit the whole loop.
+--  * 'exit' the whole loop.
 newtype LoopT c r m a = LoopT { runLoopT :: (c -> m r) -> (a -> m r) -> m r }
 
-instance Monad (LoopT c r m) where
-    m >>= k = LoopT $ \next cont ->
-              runLoopT m next $ \a ->
-              runLoopT (k a) next cont
+instance Functor (LoopT c r m) where
+    fmap f m = LoopT $ \next cont -> runLoopT m next (cont . f)
 
-    return a = LoopT $ \_ cont -> cont a
+instance Applicative (LoopT c r m) where
+    pure a    = LoopT $ \_    cont -> cont a
+    f1 <*> f2 = LoopT $ \next cont ->
+                runLoopT f1 next $ \f ->
+                runLoopT f2 next (cont . f)
+
+instance Monad (LoopT c r m) where
+    return a = LoopT $ \_    cont -> cont a
+    m >>= k  = LoopT $ \next cont ->
+               runLoopT m next $ \a ->
+               runLoopT (k a) next cont
 
 instance MonadTrans (LoopT c r) where
     lift m = LoopT $ \_ cont -> m >>= cont
+
+instance MonadIO m => MonadIO (LoopT c r m) where
+    liftIO = lift . liftIO
 
 -- | Skip the rest of the loop body and go to the next iteration.
 continue :: LoopT () r m a
