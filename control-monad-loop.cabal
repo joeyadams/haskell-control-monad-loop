@@ -1,7 +1,9 @@
 name:               control-monad-loop
 version:            0.1
-synopsis:           Monad transformer for imperative-style loops supporting break and continue
--- description:
+synopsis:           Simple monad transformer for imperative-style loops
+description:
+    A library of looping constructs with @continue@ and @exit@ control flow
+    statements.
 homepage:           https://github.com/joeyadams/haskell-control-monad-loop
 license:            BSD3
 license-file:       LICENSE

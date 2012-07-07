@@ -1,12 +1,12 @@
 module Control.Monad.Trans.Loop (
-    -- | The LoopT monad transformer
+    -- * The LoopT monad transformer
     LoopT(..),
     continue,
-    continueWith,
     exit,
+    continueWith,
     exitWith,
 
-    -- | Looping constructs
+    -- * Looping constructs
     while,
     foreach,
     stepLoopT,
@@ -37,13 +37,13 @@ instance MonadTrans (LoopT c r) where
 continue :: LoopT () r m a
 continue = continueWith ()
 
--- | Like 'continue', but return a value from the loop body.
-continueWith :: c -> LoopT c r m a
-continueWith c = LoopT $ \next _ -> next c
-
 -- | Break out of the loop entirely.
 exit :: Monad m => LoopT c () m a
 exit = exitWith ()
+
+-- | Like 'continue', but return a value from the loop body.
+continueWith :: c -> LoopT c r m a
+continueWith c = LoopT $ \next _ -> next c
 
 -- | Like 'exit', but return a value from the loop as a whole.
 -- See the documentation of 'iterateLoopT' for an example.
@@ -52,7 +52,8 @@ exitWith r = LoopT $ \_ _ -> return r
 
 ------------------------------------------------------------------------
 
--- | Repeat the loop body until the predicate no longer holds.
+-- | Repeat the loop body while the predicate holds.  Like a @while@ loop in C,
+-- the condition is tested first.
 while :: Monad m => m Bool -> LoopT c () m c -> m ()
 while cond body = loop
   where loop = do b <- cond
@@ -60,6 +61,9 @@ while cond body = loop
                        else return ()
 
 -- | Call the loop body with each item in the list.
+--
+-- If you do not need to 'continue' or 'exit' the loop, consider using
+-- 'Control.Monad.forM_' instead.
 foreach :: Monad m => [a] -> (a -> LoopT c () m c) -> m ()
 foreach list body = loop list
   where loop []     = return ()
@@ -77,7 +81,7 @@ stepLoopT body next = runLoopT body next next
 
 -- | Call the loop body again and again, passing it the result of the previous
 -- iteration each time around.  The only way to exit 'iterateLoopT' is to call
--- 'exit'.
+-- 'exit' or 'exitWith'.
 --
 -- Example:
 --
