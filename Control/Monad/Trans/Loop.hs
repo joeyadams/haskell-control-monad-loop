@@ -1,3 +1,9 @@
+-- |
+-- Module       : Control.Monad.Trans.Loop
+-- Copyright    : (c) Joseph Adams 2012
+-- License      : BSD3
+-- Maintainer   : joeyadams3.14159@gmail.com
+-- Portability  : portable
 module Control.Monad.Trans.Loop (
     -- * The LoopT monad transformer
     LoopT(..),
@@ -48,6 +54,9 @@ instance MonadTrans (LoopT c r) where
 instance MonadIO m => MonadIO (LoopT c r m) where
     liftIO = lift . liftIO
 
+------------------------------------------------------------------------
+-- continue and exit
+
 -- | Skip the rest of the loop body and go to the next iteration.
 continue :: LoopT () r m a
 continue = continueWith ()
@@ -66,6 +75,7 @@ exitWith :: Monad m => r -> LoopT c r m a
 exitWith r = LoopT $ \_ _ -> return r
 
 ------------------------------------------------------------------------
+-- Looping constructs
 
 -- | Repeat the loop body while the predicate holds.  Like a @while@ loop in C,
 -- the condition is tested first.
