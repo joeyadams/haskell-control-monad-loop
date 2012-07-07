@@ -18,3 +18,5 @@ library
 
     build-depends   : base >= 4 && < 5
                     , transformers
+
+    ghc-options: -Wall -fwarn-tabs
