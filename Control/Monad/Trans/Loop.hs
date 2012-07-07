@@ -1,8 +1,26 @@
-module Control.Monad.Trans.Loop where
+module Control.Monad.Trans.Loop (
+    -- | The LoopT monad transformer
+    LoopT(..),
+    continue,
+    continueWith,
+    exit,
+    exitWith,
+
+    -- | Looping constructs
+    while,
+    foreach,
+    stepLoopT,
+    iterateLoopT,
+) where
 
 import Control.Monad.Trans.Class
 
--- | 'LoopT' is a monad transformer for the loop body, 
+-- | 'LoopT' is a monad transformer for the loop body.  It provides two
+-- capabilities:
+--
+--  * Continue to the next iteration.
+--
+--  * Exit the whole loop.
 newtype LoopT c r m a = LoopT { runLoopT :: (c -> m r) -> (a -> m r) -> m r }
 
 instance Monad (LoopT c r m) where
@@ -16,32 +34,60 @@ instance MonadTrans (LoopT c r) where
     lift m = LoopT $ \_ cont -> m >>= cont
 
 -- | Skip the rest of the loop body and go to the next iteration.
-continueLoop :: c -> LoopT c r m a
-continueLoop c = LoopT $ \next _ -> next c
+continue :: LoopT () r m a
+continue = continueWith ()
+
+-- | Like 'continue', but return a value from the loop body.
+continueWith :: c -> LoopT c r m a
+continueWith c = LoopT $ \next _ -> next c
 
 -- | Break out of the loop entirely.
-breakLoop :: Monad m => r -> LoopT c r m a
-breakLoop r = LoopT $ \_ _ -> return r
+exit :: Monad m => LoopT c () m a
+exit = exitWith ()
+
+-- | Like 'exit', but return a value from the loop as a whole.
+-- See the documentation of 'iterateLoopT' for an example.
+exitWith :: Monad m => r -> LoopT c r m a
+exitWith r = LoopT $ \_ _ -> return r
 
 ------------------------------------------------------------------------
 
--- | Call the loop body, passing it a continuation for the next iteration.
--- This can be used to construct custom looping constructs; see the source of
--- 'foreach' for a simple example.
-stepLoopT :: LoopT c r m c -> (c -> m r) -> m r
-stepLoopT body next = runLoopT body next next
-
-iterateLoopT :: c -> (c -> LoopT c r m c) -> m r
-iterateLoopT z body = loop z
-  where loop c = stepLoopT (body c) loop
-
-foreach :: Monad m => [a] -> (a -> LoopT c () m c) -> m ()
-foreach list body = loop list
-  where loop []     = return ()
-        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
-
+-- | Repeat the loop body until the predicate no longer holds.
 while :: Monad m => m Bool -> LoopT c () m c -> m ()
 while cond body = loop
   where loop = do b <- cond
                   if b then stepLoopT body (\_ -> loop)
                        else return ()
+
+-- | Call the loop body with each item in the list.
+foreach :: Monad m => [a] -> (a -> LoopT c () m c) -> m ()
+foreach list body = loop list
+  where loop []     = return ()
+        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
+
+-- | Call a loop body, passing it a continuation for the next iteration.
+-- This can be used to construct custom looping constructs.  For example,
+-- here is the definition of 'foreach':
+--
+-- >foreach list body = loop list
+-- >  where loop []     = return ()
+-- >        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
+stepLoopT :: LoopT c r m c -> (c -> m r) -> m r
+stepLoopT body next = runLoopT body next next
+
+-- | Call the loop body again and again, passing it the result of the previous
+-- iteration each time around.  The only way to exit 'iterateLoopT' is to call
+-- 'exit'.
+--
+-- Example:
+--
+-- >count :: Int -> IO Int
+-- >count n = iterateLoopT 0 $ \i ->
+-- >    if i < n
+-- >        then do
+-- >            lift $ print i
+-- >            return $ i+1
+-- >        else exitWith i
+iterateLoopT :: c -> (c -> LoopT c r m c) -> m r
+iterateLoopT z body = loop z
+  where loop c = stepLoopT (body c) loop
