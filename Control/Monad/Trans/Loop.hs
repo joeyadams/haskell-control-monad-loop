@@ -3,7 +3,7 @@
 -- Copyright    : (c) Joseph Adams 2012
 -- License      : BSD3
 -- Maintainer   : joeyadams3.14159@gmail.com
--- Portability  : portable
+{-# LANGUAGE Rank2Types #-}
 module Control.Monad.Trans.Loop (
     -- * The LoopT monad transformer
     LoopT(..),
@@ -31,48 +31,51 @@ import Control.Monad.Trans.Class
 --  * 'continue' to the next iteration.
 --
 --  * 'exit' the whole loop.
-newtype LoopT c r m a = LoopT { runLoopT :: (c -> m r) -> (a -> m r) -> m r }
+newtype LoopT c e m a = LoopT { runLoopT :: forall r. (c -> m r)
+                                                   -> (e -> m r)
+                                                   -> (a -> m r)
+                                                   -> m r }
 
-instance Functor (LoopT c r m) where
-    fmap f m = LoopT $ \next cont -> runLoopT m next (cont . f)
+instance Functor (LoopT c e m) where
+    fmap f m = LoopT $ \next fin cont -> runLoopT m next fin (cont . f)
 
-instance Applicative (LoopT c r m) where
-    pure a    = LoopT $ \_    cont -> cont a
-    f1 <*> f2 = LoopT $ \next cont ->
-                runLoopT f1 next $ \f ->
-                runLoopT f2 next (cont . f)
+instance Applicative (LoopT c e m) where
+    pure a    = LoopT $ \_    _   cont -> cont a
+    f1 <*> f2 = LoopT $ \next fin cont ->
+                runLoopT f1 next fin $ \f ->
+                runLoopT f2 next fin (cont . f)
 
-instance Monad (LoopT c r m) where
-    return a = LoopT $ \_    cont -> cont a
-    m >>= k  = LoopT $ \next cont ->
-               runLoopT m next $ \a ->
-               runLoopT (k a) next cont
+instance Monad (LoopT c e m) where
+    return a = LoopT $ \_    _   cont -> cont a
+    m >>= k  = LoopT $ \next fin cont ->
+               runLoopT m next fin $ \a ->
+               runLoopT (k a) next fin cont
 
-instance MonadTrans (LoopT c r) where
-    lift m = LoopT $ \_ cont -> m >>= cont
+instance MonadTrans (LoopT c e) where
+    lift m = LoopT $ \_ _ cont -> m >>= cont
 
-instance MonadIO m => MonadIO (LoopT c r m) where
+instance MonadIO m => MonadIO (LoopT c e m) where
     liftIO = lift . liftIO
 
 ------------------------------------------------------------------------
 -- continue and exit
 
 -- | Skip the rest of the loop body and go to the next iteration.
-continue :: LoopT () r m a
+continue :: LoopT () e m a
 continue = continueWith ()
 
 -- | Break out of the loop entirely.
-exit :: Monad m => LoopT c () m a
+exit :: LoopT c () m a
 exit = exitWith ()
 
 -- | Like 'continue', but return a value from the loop body.
-continueWith :: c -> LoopT c r m a
-continueWith c = LoopT $ \next _ -> next c
+continueWith :: c -> LoopT c e m a
+continueWith c = LoopT $ \next _ _ -> next c
 
 -- | Like 'exit', but return a value from the loop as a whole.
 -- See the documentation of 'iterateLoopT' for an example.
-exitWith :: Monad m => r -> LoopT c r m a
-exitWith r = LoopT $ \_ _ -> return r
+exitWith :: e -> LoopT c e m a
+exitWith e = LoopT $ \_ fin _ -> fin e
 
 ------------------------------------------------------------------------
 -- Looping constructs
@@ -101,8 +104,8 @@ foreach list body = loop list
 -- >foreach list body = loop list
 -- >  where loop []     = return ()
 -- >        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
-stepLoopT :: LoopT c r m c -> (c -> m r) -> m r
-stepLoopT body next = runLoopT body next next
+stepLoopT :: Monad m => LoopT c e m c -> (c -> m e) -> m e
+stepLoopT body next = runLoopT body next return next
 
 -- | Call the loop body again and again, passing it the result of the previous
 -- iteration each time around.  The only way to exit 'iterateLoopT' is to call
@@ -117,6 +120,6 @@ stepLoopT body next = runLoopT body next next
 -- >            lift $ print i
 -- >            return $ i+1
 -- >        else exitWith i
-iterateLoopT :: c -> (c -> LoopT c r m c) -> m r
+iterateLoopT :: Monad m => c -> (c -> LoopT c e m c) -> m e
 iterateLoopT z body = loop z
   where loop c = stepLoopT (body c) loop
