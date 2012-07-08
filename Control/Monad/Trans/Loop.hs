@@ -3,7 +3,15 @@
 -- Copyright    : (c) Joseph Adams 2012
 -- License      : BSD3
 -- Maintainer   : joeyadams3.14159@gmail.com
+--
+
 {-# LANGUAGE Rank2Types #-}
+
+-- Needed for the MonadBase instance
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Control.Monad.Trans.Loop (
     -- * The LoopT monad transformer
     LoopT(..),
@@ -25,6 +33,7 @@ module Control.Monad.Trans.Loop (
 ) where
 
 import Control.Applicative
+import Control.Monad.Base
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 
@@ -65,6 +74,8 @@ instance MonadTrans (LoopT c e) where
 instance MonadIO m => MonadIO (LoopT c e m) where
     liftIO = lift . liftIO
 
+instance MonadBase b m => MonadBase b (LoopT c e m) where
+    liftBase = liftBaseDefault
 
 ------------------------------------------------------------------------
 -- continue and exit
