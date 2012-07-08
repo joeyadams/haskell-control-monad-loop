@@ -32,10 +32,10 @@ module Control.Monad.Trans.Loop (
     liftLocalLoopT,
 ) where
 
-import Control.Applicative
-import Control.Monad.Base
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
+import Control.Applicative          (Applicative(pure, (<*>)))
+import Control.Monad.Base           (MonadBase(liftBase), liftBaseDefault)
+import Control.Monad.IO.Class       (MonadIO(liftIO))
+import Control.Monad.Trans.Class    (MonadTrans(lift))
 
 -- | 'LoopT' is a monad transformer for the loop body.  It provides two
 -- capabilities:
