@@ -34,10 +34,15 @@ import Control.Monad.Trans.Class
 --  * 'continue' to the next iteration.
 --
 --  * 'exit' the whole loop.
-newtype LoopT c e m a = LoopT { runLoopT :: forall r. (c -> m r)
-                                                   -> (e -> m r)
-                                                   -> (a -> m r)
-                                                   -> m r }
+newtype LoopT c e m a = LoopT
+    { runLoopT :: forall r.     -- This universal quantification forces the
+                                -- LoopT computation to call one of the
+                                -- following continuations.
+                  (c -> m r)    -- continue
+               -> (e -> m r)    -- exit
+               -> (a -> m r)    -- return a value
+               -> m r
+    }
 
 instance Functor (LoopT c e m) where
     fmap f m = LoopT $ \next fin cont -> runLoopT m next fin (cont . f)
