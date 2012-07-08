@@ -15,6 +15,7 @@
 module Control.Monad.Trans.Loop (
     -- * The LoopT monad transformer
     LoopT(..),
+    stepLoopT,
 
     -- * continue and exit
     continue,
@@ -23,9 +24,11 @@ module Control.Monad.Trans.Loop (
     exitWith,
 
     -- * Looping constructs
-    while,
     foreach,
-    stepLoopT,
+    while,
+    doWhile,
+    once,
+    repeatLoopT,
     iterateLoopT,
 
     -- * Lifting other operations
@@ -77,6 +80,16 @@ instance MonadIO m => MonadIO (LoopT c e m) where
 instance MonadBase b m => MonadBase b (LoopT c e m) where
     liftBase = liftBaseDefault
 
+-- | Call a loop body, passing it a continuation for the next iteration.
+-- This can be used to construct custom looping constructs.  For example,
+-- here is the definition of 'foreach':
+--
+-- >foreach list body = loop list
+-- >  where loop []     = return ()
+-- >        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
+stepLoopT :: Monad m => LoopT c e m c -> (c -> m e) -> m e
+stepLoopT body next = runLoopT body next return next
+
 ------------------------------------------------------------------------
 -- continue and exit
 
@@ -103,14 +116,6 @@ exitWith e = LoopT $ \_ fin _ -> fin e
 -- Looping constructs
 
 
--- | Repeat the loop body while the predicate holds.  Like a @while@ loop in C,
--- the condition is tested first.
-while :: Monad m => m Bool -> LoopT c () m c -> m ()
-while cond body = loop
-  where loop = do b <- cond
-                  if b then stepLoopT body (\_ -> loop)
-                       else return ()
-
 -- | Call the loop body with each item in the list.
 --
 -- If you do not need to 'continue' or 'exit' the loop, consider using
@@ -120,15 +125,39 @@ foreach list body = loop list
   where loop []     = return ()
         loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
 
--- | Call a loop body, passing it a continuation for the next iteration.
--- This can be used to construct custom looping constructs.  For example,
--- here is the definition of 'foreach':
+-- | Repeat the loop body while the predicate holds.  Like a @while@ loop in C,
+-- the condition is tested first.
+while :: Monad m => m Bool -> LoopT c () m c -> m ()
+while cond body = loop
+  where loop = do b <- cond
+                  if b then stepLoopT body (\_ -> loop)
+                       else return ()
+
+-- | Like a @do while@ loop in C, where the condition is tested after
+-- the loop body.
 --
--- >foreach list body = loop list
--- >  where loop []     = return ()
--- >        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
-stepLoopT :: Monad m => LoopT c e m c -> (c -> m e) -> m e
-stepLoopT body next = runLoopT body next return next
+-- 'doWhile' returns the result of the last iteration.  This is possible
+-- because, unlike 'foreach' and 'while', the loop body is guaranteed to be
+-- executed at least once.
+doWhile :: Monad m => LoopT a a m a -> m Bool -> m a
+doWhile body cond = loop
+  where loop = stepLoopT body $ \a -> do
+            b <- cond
+            if b then loop
+                 else return a
+
+-- | Execute the loop body once.  This is a convenient way to introduce early
+-- exit support to a block of code.
+--
+-- 'continue' and 'exit' do the same thing inside of 'once'.
+once :: Monad m => LoopT a a m a -> m a
+once body = runLoopT body return return return
+
+-- | Execute the loop body again and again.  The only way to exit 'repeatLoopT'
+-- is to call 'exit' or 'exitWith'.
+repeatLoopT :: Monad m => LoopT c e m a -> m e
+repeatLoopT body = loop
+  where loop = runLoopT body (\_ -> loop) return (\_ -> loop)
 
 -- | Call the loop body again and again, passing it the result of the previous
 -- iteration each time around.  The only way to exit 'iterateLoopT' is to call
@@ -150,6 +179,7 @@ iterateLoopT z body = loop z
 
 ------------------------------------------------------------------------
 -- Lifting other operations
+
 
 -- | Lift a function like 'Control.Monad.Trans.Reader.local' or
 -- 'Control.Exception.mask_'.
