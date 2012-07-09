@@ -39,7 +39,14 @@ import Control.Applicative          (Applicative(pure, (<*>)))
 import Control.Monad.Base           (MonadBase(liftBase), liftBaseDefault)
 import Control.Monad.IO.Class       (MonadIO(liftIO))
 import Control.Monad.Trans.Class    (MonadTrans(lift))
-import Data.Foldable as Foldable    (Foldable, foldr)
+import Data.Foldable                (Foldable)
+
+import qualified Data.Foldable as Foldable
+
+
+------------------------------------------------------------------------
+-- The LoopT monad transformer
+
 
 -- | 'LoopT' is a monad transformer for the loop body.  It provides two
 -- capabilities:
@@ -83,13 +90,15 @@ instance MonadBase b m => MonadBase b (LoopT c e m) where
 
 -- | Call a loop body, passing it a continuation for the next iteration.
 -- This can be used to construct custom looping constructs.  For example,
--- here is the definition of 'foreach':
+-- here is how 'foreach' could be defined:
 --
+-- >foreach :: Monad m => [a] -> (a -> LoopT c () m c) -> m ()
 -- >foreach list body = loop list
 -- >  where loop []     = return ()
 -- >        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
 stepLoopT :: Monad m => LoopT c e m c -> (c -> m e) -> m e
 stepLoopT body next = runLoopT body next return next
+
 
 ------------------------------------------------------------------------
 -- continue and exit
@@ -117,14 +126,14 @@ exitWith e = LoopT $ \_ fin _ -> fin e
 -- Looping constructs
 
 
--- | Call the loop body with each item in the list.
+-- | Call the loop body with each item in the collection.
 --
 -- If you do not need to 'continue' or 'exit' the loop, consider using
--- 'Control.Monad.forM_' instead.
+-- 'Foldable.forM_' instead.
 foreach :: (Foldable f, Monad m) => f a -> (a -> LoopT c () m c) -> m ()
 foreach list body =
   Foldable.foldr
-    (\x a -> stepLoopT (body x) (const a))
+    (\x next -> stepLoopT (body x) (\_ -> next))
     (return ())
     list
 
