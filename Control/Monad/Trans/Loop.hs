@@ -39,6 +39,7 @@ import Control.Applicative          (Applicative(pure, (<*>)))
 import Control.Monad.Base           (MonadBase(liftBase), liftBaseDefault)
 import Control.Monad.IO.Class       (MonadIO(liftIO))
 import Control.Monad.Trans.Class    (MonadTrans(lift))
+import Data.Foldable as Foldable    (Foldable, foldr)
 
 -- | 'LoopT' is a monad transformer for the loop body.  It provides two
 -- capabilities:
@@ -120,10 +121,12 @@ exitWith e = LoopT $ \_ fin _ -> fin e
 --
 -- If you do not need to 'continue' or 'exit' the loop, consider using
 -- 'Control.Monad.forM_' instead.
-foreach :: Monad m => [a] -> (a -> LoopT c () m c) -> m ()
-foreach list body = loop list
-  where loop []     = return ()
-        loop (x:xs) = stepLoopT (body x) (\_ -> loop xs)
+foreach :: (Foldable f, Monad m) => f a -> (a -> LoopT c () m c) -> m ()
+foreach list body =
+  Foldable.foldr
+    (\x a -> stepLoopT (body x) (const a))
+    (return ())
+    list
 
 -- | Repeat the loop body while the predicate holds.  Like a @while@ loop in C,
 -- the condition is tested first.
