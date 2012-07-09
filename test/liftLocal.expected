@@ -1,0 +1,24 @@
+test1: 1: getMaskingState: Unmasked
+test1: 1: getMaskingState: MaskedInterruptible
+test1: 1: getMaskingState: MaskedInterruptible
+test1: 2: getMaskingState: Unmasked
+test1: 2: getMaskingState: MaskedInterruptible
+test1: 2: getMaskingState: MaskedInterruptible
+test1: 3: getMaskingState: Unmasked
+test1: 3: getMaskingState: MaskedInterruptible
+test1: 3: continue
+test1: 4: getMaskingState: Unmasked
+test1: 4: getMaskingState: MaskedInterruptible
+test1: 4: getMaskingState: MaskedInterruptible
+test2: 1: ask: 0
+test2: 1: ask: 1
+test2: 1: ask: 1
+test2: 2: ask: 0
+test2: 2: ask: 1
+test2: 2: ask: 1
+test2: 3: ask: 0
+test2: 3: ask: 1
+test2: 3: continue
+test2: 4: ask: 0
+test2: 4: ask: 1
+test2: 4: ask: 1

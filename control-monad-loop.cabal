@@ -17,8 +17,11 @@ cabal-version:      >=1.8
 
 extra-source-files:
     test/leak.hs
+    test/leak.expected
     test/liftLocal.hs
+    test/liftLocal.expected
     test/lift-continue.hs
+    test/lift-continue.expected
     test/recycled-numbers.hs
 
 source-repository head

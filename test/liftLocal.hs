@@ -47,3 +47,8 @@ test2 =
                 log "continue"
                 continue
             logAsk
+
+main :: IO ()
+main = do
+    test1
+    test2
